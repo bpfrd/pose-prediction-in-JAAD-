@@ -5,11 +5,45 @@ import torch.optim as optim
 import time
 import DataLoader
 import datetime
+from PIL import Image, ImageDraw
 
-#device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
-device = torch.device('cpu')
+device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
+#device = torch.device('cpu')
 filename_save = "checkpoint_lstm.pkl"
 l2_lambda = 0.
+
+JOINTS = [(0,1),(0,2),(1,3),(2,4),(3,5),(4,6),(5,7),(6,8),(7,9),(8,10),(5,6),(5,11),(6,12),(11,12),(11,13),(12,14),(13,15),(14,16)]
+
+def visualization(obs_p, obs_scenes, pred_p, true_p, scenes, prefix):
+
+    obs_len, l = obs_p.shape
+    obs = obs_p.view(obs_len, l//2, 2)
+    pred_len, l = pred_p.shape
+    pred = pred_p.view(pred_len, l//2, 2)
+    true = true_p.view(pred_len, l//2, 2)
+
+    images = []
+    for time in range(obs_len):
+        im = Image.open(obs_scenes[time].replace("JAAD/scene/", "video_"))
+        img = ImageDraw.Draw(im)
+        for joint in JOINTS:
+            obs_points = (obs[time, joint[0],0], obs[time, joint[0], 1], obs[time, joint[1],0], obs[time, joint[1], 1])
+            img.line(obs_points, fill="blue", width=5)
+        images.append(im)
+    images[0].save(f"{prefix}-observation.gif", save_all=True, loop=0, duration=500, append_images=images[1:])
+
+    images = []
+    for time in range(pred_len):
+        im = Image.open(scenes[time].replace("JAAD/scene/", "video_"))
+        img = ImageDraw.Draw(im)
+        for joint in JOINTS:
+            pred_points = (pred[time, joint[0],0], pred[time, joint[0], 1], pred[time, joint[1],0], pred[time, joint[1], 1])
+            true_points = (true[time, joint[0],0], true[time, joint[0], 1], true[time, joint[1],0], true[time, joint[1], 1])
+            img.line(pred_points, fill="red", width=5)
+            img.line(true_points, fill="green", width=5)
+        images.append(im)
+    images[0].save(f"{prefix}-future.gif", save_all=True, loop=0, duration=500, append_images=images[1:])
+
 
 def ade(pred, true):
     seq_len, batch, l = true.shape
@@ -63,11 +97,12 @@ def training_loop(n_epochs, optimizer, scheduler, model, loss_fn, train_loader, 
         start = time.time()
         for idx, (obs_p, obs_s, obs_f, target_p, target_s, target_f, obs_c, target_c, label_c) in enumerate(train_loader):
 
+
             obs_p = obs_p.to(device=device).double() 
             obs_s = obs_s.to(device=device).double()
             target_p = target_p.to(device=device).double() 
             target_s = target_s.to(device=device).double()
-
+   
             pred_s = model(obs_s=obs_s)
             loss = loss_fn(pred_s, target_s)
 
@@ -95,6 +130,9 @@ def training_loop(n_epochs, optimizer, scheduler, model, loss_fn, train_loader, 
         ade_train /= count_train
         fde_train /= count_train    
         scheduler.step(loss_train)
+
+        if(epoch % 20 == 0):
+            visualization(obs_p[:,0], obs_f[0], pred_p[:,0], target_p[:,0], target_f[0], "unconverged")
 
         loss_val = 0.0
         ade_val = 0.0
@@ -183,9 +221,11 @@ args.save_path = args.save_path.replace('train', 'val')
 args.file = args.file.replace('train', 'val')
 val_loader = DataLoader.data_loader(args)
 
+(obs_p, obs_s, obs_f, target_p, target_s, target_f, obs_c, target_c, label_c) = next(iter(train_loader))
+print(f"debug: path {target_f} {len(target_f)}")
 
 print('Training ...')
-training_loop(n_epochs=10000,
+training_loop(n_epochs=1000,
            optimizer=optimizer, 
            scheduler=scheduler,
            model=model,

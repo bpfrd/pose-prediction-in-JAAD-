@@ -14,7 +14,7 @@ class myJAAD(torch.utils.data.Dataset):
         print('Loading', args.dtype, 'data ...')
         
         if(args.from_file):
-            sequence_centric = pd.read_csv(args.file).head(5)
+            sequence_centric = pd.read_csv(args.file).sample(1)
             df = sequence_centric.copy()      
             for v in list(df.columns.values):
                 print(v+' loaded')
@@ -42,9 +42,9 @@ class myJAAD(torch.utils.data.Dataset):
         seq = self.data.iloc[index]
         outputs = []
         ########################################################## 
-        scene_paths = [os.path.join("/work/vita/JAAD_clips_bodyposes_by_openpifpaf/images/"+seq["scenefolderpath"][frame],"0"+ seq["filename"][frame]) 
+        scene_paths = [os.path.join("/work/vita/datasets/JAAD/JAAD_clips_bodyposes_by_openpifpaf/images/"+seq["scenefolderpath"][frame],"0"+ seq["filename"][frame]) 
                            for frame in range(0,self.args.input,self.args.skip)]
-        scene_paths_t = [os.path.join("/work/vita/JAAD_clips_bodyposes_by_openpifpaf/images/"+seq["scenefolderpath_t"][frame], "0"+seq["filename_t"][frame]) 
+        scene_paths_t = [os.path.join("/work/vita/datasets/JAAD/JAAD_clips_bodyposes_by_openpifpaf/images/"+seq["scenefolderpath_t"][frame], "0"+seq["filename_t"][frame]) 
                            for frame in range(0,self.args.output,self.args.skip)]
       
         observed_keypoints = torch.tensor(np.array(seq.keypoints))
